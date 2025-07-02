@@ -12,6 +12,7 @@ const attendanceSchema = new mongoose.Schema({
     default: Date.now,
     validate: {
       validator: function(date) {
+        // Attendance date cannot be in the future
         return date <= new Date();
       },
       message: 'Attendance date cannot be in the future'
@@ -25,6 +26,7 @@ const attendanceSchema = new mongoose.Schema({
     type: Date,
     validate: {
       validator: function(time) {
+        // Check-out must be after check-in if provided
         return !time || time > this.checkIn;
       },
       message: 'Check-out must be after check-in'
@@ -35,21 +37,32 @@ const attendanceSchema = new mongoose.Schema({
     enum: ['present', 'absent', 'late', 'half-day', 'on-leave'], 
     default: 'present' 
   },
-  ipAddress: String,
-  deviceInfo: String,
+  ipAddress: {
+    type: String,
+    trim: true
+  },
+  deviceInfo: {
+    type: String,
+    trim: true
+  },
   notes: { 
     type: String, 
     maxlength: [200, 'Notes cannot exceed 200 characters'] 
   }
-}, { timestamps: true });
-
-// Calculate working hours
-attendanceSchema.virtual('workingHours').get(function() {
-  if (!this.checkOut) return null;
-  return ((this.checkOut - this.checkIn) / (1000 * 60 * 60)).toFixed(2); // in hours
+}, { 
+  timestamps: true, // Automatically add createdAt and updatedAt fields
+  collection: 'attendance' // <-- IMPORTANT: Use singular collection name matching your DB
 });
 
-// Prevent duplicate attendance records
+// Virtual property to calculate working hours in decimal hours (e.g., 7.50)
+attendanceSchema.virtual('workingHours').get(function() {
+  if (!this.checkOut || !this.checkIn) return null;
+  const diffMs = this.checkOut - this.checkIn;
+  const hours = diffMs / (1000 * 60 * 60);
+  return Number(hours.toFixed(2)); // Return as number rounded to 2 decimals
+});
+
+// Ensure unique attendance record per employee per date
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

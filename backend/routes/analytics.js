@@ -1,15 +1,51 @@
 const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analyticsController');
-const auth = require('../middlewares/auth');
-const adminCheck = require('../middlewares/adminCheck');
+const { protect, restrictTo } = require('../middleware/auth');
+const { ROLES } = require('../constants');
+const { validateQueryParams } = require('../middleware/validation');
+const { query } = require('express-validator');
 
-// Define analytics routes with authentication and authorization
-router.get('/', auth, adminCheck, analyticsController.getAnalytics);
+// Protect all analytics routes
+router.use(protect);
 
-// Add more specific analytics endpoints
-router.get('/department', auth, adminCheck, analyticsController.getDepartmentAnalytics);
-router.get('/attendance', auth, adminCheck, analyticsController.getAttendanceAnalytics);
-router.get('/salary', auth, adminCheck, analyticsController.getSalaryAnalytics);
+// Input validation schemas
+const attendanceQuerySchema = [
+  query('startDate').optional().isISO8601().toDate(),
+  query('endDate').optional().isISO8601().toDate(),
+  query('department').optional().isMongoId(),
+  query('status').optional().isIn(['present', 'absent', 'late', 'on-leave'])
+];
+
+const salaryQuerySchema = [
+  query('department').optional().isMongoId(),
+  query('position').optional().isString().trim()
+];
+
+// Analytics Dashboard
+router.get('/', 
+  restrictTo(ROLES.ADMIN, ROLES.HR_MANAGER),
+  analyticsController.getAnalytics
+);
+
+// Department Analytics
+router.get('/department', 
+  restrictTo(ROLES.ADMIN, ROLES.HR_MANAGER, ROLES.DEPARTMENT_MANAGER),
+  analyticsController.getDepartmentAnalytics
+);
+
+// Attendance Analytics
+router.get('/attendance', 
+  restrictTo(ROLES.ADMIN, ROLES.HR_MANAGER),
+  validateQueryParams(attendanceQuerySchema),
+  analyticsController.getAttendanceAnalytics
+);
+
+// Salary Analytics
+router.get('/salary', 
+  restrictTo(ROLES.ADMIN, ROLES.HR_MANAGER),
+  validateQueryParams(salaryQuerySchema),
+  analyticsController.getSalaryAnalytics
+);
 
 module.exports = router;

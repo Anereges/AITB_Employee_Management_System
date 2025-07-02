@@ -1,288 +1,343 @@
+const fs = require('fs');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Employee = require('../models/Employee');
-const fs = require('fs');
-const path = require('path');
+const AppError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
 const generateEmployeeId = require('../utils/generateEmployeeId');
+const { sendEmail } = require('../services/emailService');
 
-// Register Employee
-const registerEmployee = async (req, res) => {
-    try {
-        const {
-            fullName,
-            email,
-            phone,
-            username,
-            password,
-            confirmPassword,
-            companyName,
-            role,
-            department,
-            position,
-            salary,
-            hireDate,
-        } = req.body;
+// @desc    Register a new employee (Admin only)
+// @route   POST /api/employees/register
+// @access  Private/Admin
+exports.registerEmployee = catchAsync(async (req, res, next) => {
+  const {
+    fullName, email, phone, username, password, confirmPassword,
+    companyName, role, department, position, salary, employmentType
+  } = req.body;
 
-        // Generate unique Employee ID
-        const employeeId = await generateEmployeeId();
+  // 1) Basic validation
+  if (password !== confirmPassword) {
+    return next(new AppError('Passwords do not match', 400));
+  }
 
-        const profileImage = req.file ? req.file.filename : null;
+  // 2) Check for existing employee
+  if (await Employee.findOne({ email })) {
+    return next(new AppError('Email already in use', 400));
+  }
 
-        // Validation
-        const requiredFields = ['fullName', 'email', 'username', 'password', 'phone', 'companyName', 'role'];
-        const missingFields = requiredFields.filter(field => !req.body[field]);
-        
-        if (missingFields.length > 0) {
-            return res.status(400).json({ 
-                message: 'Missing required fields',
-                missingFields 
-            });
-        }
+  if (await Employee.findOne({ username })) {
+    return next(new AppError('Username already taken', 400));
+  }
 
-        if (password !== confirmPassword) {
-            return res.status(400).json({ message: 'Passwords do not match' });
-        }
+  // 3) Handle file upload
+  const profileImage = req.file ? `/uploads/profile-images/${req.file.filename}` : null;
 
-        if (password.length < 8) {
-            return res.status(400).json({ message: 'Password must be at least 8 characters' });
-        }
+  // 4) Create employee
+  const newEmployee = await Employee.create({
+    employeeId: await generateEmployeeId(),
+    fullName,
+    email,
+    phone,
+    username,
+    password,
+    companyName,
+    role: role || 'employee',
+    department,
+    position,
+    salary: parseFloat(salary) || 0,
+    employmentType: employmentType || 'full-time',
+    isActive: true,
+    profileImage
+  });
 
-        // Check for existing employee
-        const existingEmployee = await Employee.findOne({ $or: [{ email }, { username }] });
-        if (existingEmployee) {
-            return res.status(400).json({ 
-                message: 'Employee with this email or username already exists',
-                conflict: existingEmployee.email === email ? 'email' : 'username'
-            });
-        }
+  // 5) Remove sensitive data from output
+  newEmployee.password = undefined;
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 12);
-
-        // Create new employee
-        const newEmployee = new Employee({
-            employeeId,
-            fullName,
-            email,
-            phone,
-            username,
-            password: hashedPassword,
-            companyName,
-            role,
-            department,
-            position,
-            salary: parseFloat(salary),
-            hireDate: hireDate || new Date(),
-            profileImage,
-        });
-
-        await newEmployee.save();
-
-        // Remove password from response
-        const employeeResponse = newEmployee.toObject();
-        delete employeeResponse.password;
-
-        res.status(201).json({
-            message: 'Employee registered successfully',
-            employee: employeeResponse
-        });
-    } catch (error) {
-        console.error('Registration error:', error);
-        
-        // Delete uploaded file if error occurred
-        if (req.file) {
-            fs.unlinkSync(req.file.path);
-        }
-
-        res.status(500).json({ 
-            message: 'Failed to register employee',
-            error: error.message 
-        });
+  // 6) Send welcome email
+  await sendEmail({
+    email: newEmployee.email,
+    subject: 'Welcome to Our Company',
+    template: 'welcomeEmployee',
+    data: {
+      name: newEmployee.fullName,
+      username: newEmployee.username,
+      position: newEmployee.position,
+      department: newEmployee.department
     }
-};
+  });
 
-// Login Employee
-const loginEmployee = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  res.status(201).json({
+    status: 'success',
+    message: 'Employee created successfully',
+    data: { employee: newEmployee }
+  });
+});
 
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
+// @desc    Login employee
+// @route   POST /api/employees/login
+// @access  Public
+exports.loginEmployee = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
 
-        const employee = await Employee.findOne({ email }).select('+password');
-        if (!employee) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
+  // 1) Check if email and password exist
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password', 400));
+  }
 
-        const isMatch = await bcrypt.compare(password, employee.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
+  // 2) Check if employee exists and password is correct
+  const employee = await Employee.findOne({ email }).select('+password');
+  
+  if (!employee || !(await employee.comparePassword(password))) {
+    return next(new AppError('Incorrect email or password', 401));
+  }
 
-        const token = jwt.sign(
-            { 
-                id: employee._id, 
-                role: employee.role, 
-                username: employee.username,
-                employeeId: employee.employeeId
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
-        );
+  // 3) Check if account is active
+  if (!employee.isActive) {
+    return next(new AppError('Your account is inactive. Please contact admin.', 403));
+  }
 
-        // Remove sensitive data
-        employee.password = undefined;
+  // 4) Update last login
+  employee.lastLogin = new Date();
+  await employee.save({ validateBeforeSave: false });
 
-        res.status(200).json({
-            message: 'Login successful',
-            token,
-            expiresIn: 86400, // 1 day in seconds
-            employee
-        });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ 
-            message: 'Login failed',
-            error: error.message 
-        });
+  // 5) Generate token
+  const token = jwt.sign(
+    { 
+      id: employee._id,
+      employeeId: employee.employeeId,
+      role: employee.role 
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+  );
+
+  // 6) Send response
+  res.status(200).json({
+    status: 'success',
+    token,
+    expiresIn: process.env.JWT_EXPIRES_IN || 86400,
+    data: {
+      employee: {
+        id: employee._id,
+        fullName: employee.fullName,
+        email: employee.email,
+        role: employee.role,
+        profileImage: employee.profileImage,
+        department: employee.department
+      }
     }
-};
+  });
+});
 
-// Get All Employees (with pagination and filtering)
-const getAllEmployees = async (req, res) => {
-    try {
-        const { page = 1, limit = 10, department, role } = req.query;
-        const filter = {};
-        
-        if (department) filter.department = department;
-        if (role) filter.role = role;
+// @desc    Get all employees
+// @route   GET /api/employees
+// @access  Private/Admin
+exports.getAllEmployees = catchAsync(async (req, res, next) => {
+  const { page = 1, limit = 10, department, role, search } = req.query;
+  const filter = {};
+  
+  if (department) filter.department = department;
+  if (role) filter.role = role;
+  if (search) {
+    filter.$or = [
+      { fullName: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { employeeId: { $regex: search, $options: 'i' } }
+    ];
+  }
 
-        const employees = await Employee.find(filter)
-            .limit(limit * 1)
-            .skip((page - 1) * limit)
-            .sort({ fullName: 1 });
+  const employees = await Employee.find(filter)
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ createdAt: -1 })
+    .select('-password -temporaryPassword');
 
-        const count = await Employee.countDocuments(filter);
+  const count = await Employee.countDocuments(filter);
 
-        res.status(200).json({
-            total: count,
-            totalPages: Math.ceil(count / limit),
-            currentPage: page,
-            employees
-        });
-    } catch (error) {
-        console.error('Fetch error:', error);
-        res.status(500).json({ 
-            message: 'Error fetching employees',
-            error: error.message 
-        });
+  res.status(200).json({
+    status: 'success',
+    results: count,
+    totalPages: Math.ceil(count / limit),
+    currentPage: page,
+    data: { employees }
+  });
+});
+
+// @desc    Get employee profile
+// @route   GET /api/employees/:id
+// @access  Private
+exports.getEmployee = catchAsync(async (req, res, next) => {
+  const employee = await Employee.findById(req.params.id)
+    .select('-password -temporaryPassword');
+
+  if (!employee) {
+    return next(new AppError('No employee found with that ID', 404));
+  }
+
+  // Check if requester is admin or the employee themselves
+  if (req.employee.role !== 'admin' && !req.employee._id.equals(employee._id)) {
+    return next(new AppError('Not authorized to access this resource', 403));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { employee }
+  });
+});
+
+// @desc    Update employee profile
+// @route   PATCH /api/employees/:id
+// @access  Private
+exports.updateEmployee = catchAsync(async (req, res, next) => {
+  // 1) Filter out unwanted fields
+  const filteredBody = {
+    fullName: req.body.fullName,
+    phone: req.body.phone,
+    address: req.body.address,
+    dateOfBirth: req.body.dateOfBirth,
+    gender: req.body.gender
+  };
+
+  // Admin can update more fields
+  if (req.employee.role === 'admin') {
+    filteredBody.department = req.body.department;
+    filteredBody.position = req.body.position;
+    filteredBody.salary = req.body.salary;
+    filteredBody.role = req.body.role;
+    filteredBody.isActive = req.body.isActive;
+  }
+
+  // 2) Handle profile image
+  if (req.file) {
+    filteredBody.profileImage = `/uploads/profile-images/${req.file.filename}`;
+  }
+
+  // 3) Update employee
+  const employee = await Employee.findByIdAndUpdate(
+    req.params.id,
+    filteredBody,
+    { new: true, runValidators: true }
+  ).select('-password -temporaryPassword');
+
+  if (!employee) {
+    return next(new AppError('No employee found with that ID', 404));
+  }
+
+  // 4) Delete old profile image if new one was uploaded
+  if (req.file && employee.profileImage !== req.file.filename) {
+    const oldImagePath = path.join(__dirname, '../public', employee.profileImage);
+    if (fs.existsSync(oldImagePath)) {
+      fs.unlinkSync(oldImagePath);
     }
-};
+  }
 
-// Get Employee by ID
-const getEmployeeById = async (req, res) => {
-    try {
-        const employee = await Employee.findById(req.params.id);
-        if (!employee) {
-            return res.status(404).json({ message: 'Employee not found' });
-        }
+  res.status(200).json({
+    status: 'success',
+    message: 'Employee updated successfully',
+    data: { employee }
+  });
+});
 
-        res.status(200).json(employee);
-    } catch (error) {
-        console.error('Fetch error:', error);
-        res.status(500).json({ 
-            message: 'Error fetching employee',
-            error: error.message 
-        });
+// @desc    Deactivate employee account
+// @route   PATCH /api/employees/:id/deactivate
+// @access  Private/Admin
+exports.deactivateEmployee = catchAsync(async (req, res, next) => {
+  const employee = await Employee.findByIdAndUpdate(
+    req.params.id,
+    { isActive: false },
+    { new: true }
+  ).select('-password -temporaryPassword');
+
+  if (!employee) {
+    return next(new AppError('No employee found with that ID', 404));
+  }
+
+  await sendEmail({
+    email: employee.email,
+    subject: 'Your account has been deactivated',
+    template: 'accountDeactivated',
+    data: {
+      name: employee.fullName,
+      adminEmail: req.employee.email
     }
-};
+  });
 
-// Update Employee
-const updateEmployee = async (req, res) => {
-    try {
-        const updates = req.body;
-        
-        // Remove restricted fields
-        delete updates.password;
-        delete updates.employeeId;
-        delete updates._id;
+  res.status(200).json({
+    status: 'success',
+    message: 'Employee account deactivated',
+    data: { employee }
+  });
+});
 
-        if (req.file) {
-            updates.profileImage = req.file.filename;
-        }
+// @desc    Reactivate employee account
+// @route   PATCH /api/employees/:id/reactivate
+// @access  Private/Admin
+exports.reactivateEmployee = catchAsync(async (req, res, next) => {
+  const employee = await Employee.findByIdAndUpdate(
+    req.params.id,
+    { isActive: true },
+    { new: true }
+  ).select('-password -temporaryPassword');
 
-        const employee = await Employee.findByIdAndUpdate(
-            req.params.id,
-            updates,
-            { new: true, runValidators: true }
-        );
+  if (!employee) {
+    return next(new AppError('No employee found with that ID', 404));
+  }
 
-        if (!employee) {
-            return res.status(404).json({ message: 'Employee not found' });
-        }
-
-        // Delete old profile image if new one was uploaded
-        if (req.file && employee.profileImage !== req.file.filename) {
-            const oldImagePath = path.join(__dirname, '../uploads', employee.profileImage);
-            if (fs.existsSync(oldImagePath)) {
-                fs.unlinkSync(oldImagePath);
-            }
-        }
-
-        res.status(200).json({
-            message: 'Employee updated successfully',
-            employee
-        });
-    } catch (error) {
-        console.error('Update error:', error);
-        
-        // Delete uploaded file if error occurred
-        if (req.file) {
-            fs.unlinkSync(req.file.path);
-        }
-
-        res.status(500).json({ 
-            message: 'Failed to update employee',
-            error: error.message 
-        });
+  await sendEmail({
+    email: employee.email,
+    subject: 'Your account has been reactivated',
+    template: 'accountReactivated',
+    data: {
+      name: employee.fullName,
+      loginLink: `${req.protocol}://${req.get('host')}/login`
     }
-};
+  });
 
-// Delete Employee
-const deleteEmployee = async (req, res) => {
-    try {
-        const employee = await Employee.findByIdAndDelete(req.params.id);
-        if (!employee) {
-            return res.status(404).json({ message: 'Employee not found' });
-        }
+  res.status(200).json({
+    status: 'success',
+    message: 'Employee account reactivated',
+    data: { employee }
+  });
+});
 
-        // Delete profile image if exists
-        if (employee.profileImage) {
-            const imagePath = path.join(__dirname, '../uploads', employee.profileImage);
-            if (fs.existsSync(imagePath)) {
-                fs.unlinkSync(imagePath);
-            }
-        }
+// @desc    Change employee password
+// @route   PATCH /api/employees/change-password
+// @access  Private
+exports.changePassword = catchAsync(async (req, res, next) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
 
-        res.status(200).json({ 
-            message: 'Employee deleted successfully',
-            deletedEmployee: employee 
-        });
-    } catch (error) {
-        console.error('Deletion error:', error);
-        res.status(500).json({ 
-            message: 'Failed to delete employee',
-            error: error.message 
-        });
+  // 1) Check if new passwords match
+  if (newPassword !== confirmPassword) {
+    return next(new AppError('New passwords do not match', 400));
+  }
+
+  // 2) Get employee with password
+  const employee = await Employee.findById(req.employee.id).select('+password');
+
+  // 3) Check if current password is correct
+  if (!(await employee.comparePassword(currentPassword))) {
+    return next(new AppError('Current password is incorrect', 401));
+  }
+
+  // 4) Update password
+  employee.password = newPassword;
+  await employee.save();
+
+  // 5) Send password change notification
+  await sendEmail({
+    email: employee.email,
+    subject: 'Password Changed Successfully',
+    template: 'passwordChanged',
+    data: {
+      name: employee.fullName,
+      timestamp: new Date().toLocaleString()
     }
-};
+  });
 
-module.exports = {
-    registerEmployee,
-    loginEmployee,
-    getAllEmployees,
-    getEmployeeById,
-    updateEmployee,
-    deleteEmployee
-};
+  res.status(200).json({
+    status: 'success',
+    message: 'Password updated successfully'
+  });
+});

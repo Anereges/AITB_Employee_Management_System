@@ -10,16 +10,22 @@ const departmentSchema = new mongoose.Schema({
   },
   manager: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Employee' 
+    ref: 'Employee',
+    default: null // Allows department without a manager initially
   },
-  location: String,
+  location: {
+    type: String,
+    trim: true
+  },
   budget: { 
     type: Number, 
-    min: [0, 'Budget cannot be negative'] 
+    min: [0, 'Budget cannot be negative'],
+    default: 0 // Default budget value
   },
   description: { 
     type: String, 
-    maxlength: [500, 'Description cannot exceed 500 characters'] 
+    maxlength: [500, 'Description cannot exceed 500 characters'],
+    trim: true
   },
   isActive: { 
     type: Boolean, 
@@ -27,14 +33,16 @@ const departmentSchema = new mongoose.Schema({
   }
 }, { 
   timestamps: true,
-  toJSON: { virtuals: true } 
+  toJSON: { virtuals: true }, // Include virtuals when converting to JSON
+  toObject: { virtuals: true } // Include virtuals when converting to object
 });
 
 // Virtual for department employees
 departmentSchema.virtual('employees', {
   ref: 'Employee',
   localField: '_id',
-  foreignField: 'department'
+  foreignField: 'department',
+  options: { sort: { fullName: 1 } } // Example: sort employees by name
 });
 
 module.exports = mongoose.model('Department', departmentSchema);
