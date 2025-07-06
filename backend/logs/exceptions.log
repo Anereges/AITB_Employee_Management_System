@@ -22821,3 +22821,215 @@ ReferenceError: reportController is not defined
     }
   ]
 }
+2025-07-04 02:14:17 [error] uncaughtException: Cannot find module '../models/Task'
+Require stack:
+- Q:\AITB_Employee-Management-System\backend\routes\dashboardRoutes.js
+- Q:\AITB_Employee-Management-System\backend\server.js
+Error: Cannot find module '../models/Task'
+Require stack:
+- Q:\AITB_Employee-Management-System\backend\routes\dashboardRoutes.js
+- Q:\AITB_Employee-Management-System\backend\server.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1225:15)
+    at Function._load (node:internal/modules/cjs/loader:1055:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.require (node:internal/modules/cjs/loader:1311:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (Q:\AITB_Employee-Management-System\backend\routes\dashboardRoutes.js:4:14)
+    at Module._compile (node:internal/modules/cjs/loader:1554:14)
+    at Object..js (node:internal/modules/cjs/loader:1706:10)
+    at Module.load (node:internal/modules/cjs/loader:1289:32)
+    at Function._load (node:internal/modules/cjs/loader:1108:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.require (node:internal/modules/cjs/loader:1311:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (Q:\AITB_Employee-Management-System\backend\server.js:192:25)
+Error: Cannot find module '../models/Task'
+Require stack:
+- Q:\AITB_Employee-Management-System\backend\routes\dashboardRoutes.js
+- Q:\AITB_Employee-Management-System\backend\server.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1225:15)
+    at Function._load (node:internal/modules/cjs/loader:1055:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.require (node:internal/modules/cjs/loader:1311:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (Q:\AITB_Employee-Management-System\backend\routes\dashboardRoutes.js:4:14)
+    at Module._compile (node:internal/modules/cjs/loader:1554:14)
+    at Object..js (node:internal/modules/cjs/loader:1706:10)
+    at Module.load (node:internal/modules/cjs/loader:1289:32)
+    at Function._load (node:internal/modules/cjs/loader:1108:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Module.require (node:internal/modules/cjs/loader:1311:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (Q:\AITB_Employee-Management-System\backend\server.js:192:25)
+{
+  "error": {
+    "code": "MODULE_NOT_FOUND",
+    "requireStack": [
+      "Q:\\AITB_Employee-Management-System\\backend\\routes\\dashboardRoutes.js",
+      "Q:\\AITB_Employee-Management-System\\backend\\server.js"
+    ]
+  },
+  "exception": true,
+  "date": "Fri Jul 04 2025 02:14:17 GMT-0900 (Hawaii-Aleutian Daylight Time)",
+  "process": {
+    "pid": 11640,
+    "uid": null,
+    "gid": null,
+    "cwd": "Q:\\AITB_Employee-Management-System\\backend",
+    "execPath": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "v22.14.0",
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "Q:\\AITB_Employee-Management-System\\backend\\server.js"
+    ],
+    "memoryUsage": {
+      "rss": 109703168,
+      "heapTotal": 74588160,
+      "heapUsed": 35955008,
+      "external": 20696562,
+      "arrayBuffers": 18298919
+    }
+  },
+  "os": {
+    "loadavg": [
+      0,
+      0,
+      0
+    ],
+    "uptime": 14574.906
+  },
+  "trace": [
+    {
+      "column": 15,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Function._resolveFilename",
+      "line": 1225,
+      "method": "_resolveFilename",
+      "native": false
+    },
+    {
+      "column": 27,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Function._load",
+      "line": 1055,
+      "method": "_load",
+      "native": false
+    },
+    {
+      "column": 14,
+      "file": "node:diagnostics_channel",
+      "function": "TracingChannel.traceSync",
+      "line": 322,
+      "method": "traceSync",
+      "native": false
+    },
+    {
+      "column": 24,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "wrapModuleLoad",
+      "line": 220,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Module.require",
+      "line": 1311,
+      "method": "require",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "node:internal/modules/helpers",
+      "function": "require",
+      "line": 136,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 14,
+      "file": "Q:\\AITB_Employee-Management-System\\backend\\routes\\dashboardRoutes.js",
+      "function": null,
+      "line": 4,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 14,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Module._compile",
+      "line": 1554,
+      "method": "_compile",
+      "native": false
+    },
+    {
+      "column": 10,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Object..js",
+      "line": 1706,
+      "method": ".js",
+      "native": false
+    },
+    {
+      "column": 32,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Module.load",
+      "line": 1289,
+      "method": "load",
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Function._load",
+      "line": 1108,
+      "method": "_load",
+      "native": false
+    },
+    {
+      "column": 14,
+      "file": "node:diagnostics_channel",
+      "function": "TracingChannel.traceSync",
+      "line": 322,
+      "method": "traceSync",
+      "native": false
+    },
+    {
+      "column": 24,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "wrapModuleLoad",
+      "line": 220,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 12,
+      "file": "node:internal/modules/cjs/loader",
+      "function": "Module.require",
+      "line": 1311,
+      "method": "require",
+      "native": false
+    },
+    {
+      "column": 16,
+      "file": "node:internal/modules/helpers",
+      "function": "require",
+      "line": 136,
+      "method": null,
+      "native": false
+    },
+    {
+      "column": 25,
+      "file": "Q:\\AITB_Employee-Management-System\\backend\\server.js",
+      "function": null,
+      "line": 192,
+      "method": null,
+      "native": false
+    }
+  ]
+}

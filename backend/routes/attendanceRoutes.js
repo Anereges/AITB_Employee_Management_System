@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
+
 const {
   checkIn,
   checkOut,
   getAttendance,
   getEmployeeAttendance,
   getAttendanceSummary,
-  adminAddAttendance
+  adminAddAttendance,
+  markDailyAttendance // 👈 new controller for hybrid auto-attendance
 } = require('../controllers/attendanceController');
 
 const authorize = require('../middleware/authorize');
@@ -14,19 +16,15 @@ const authController = require('../controllers/auth.controller');
 const { check } = require('express-validator');
 const validate = require('../middleware/validate');
 
-// Debug logs (optional, remove in production)
-console.log('authorize.employee:', typeof authorize.employee);
-console.log('authorize.hrOrAdmin:', typeof authorize.hrOrAdmin);
-console.log('authController.protect:', typeof authController.protect);
-console.log('validate:', typeof validate);
-console.log('checkIn:', typeof checkIn);
-console.log('checkOut:', typeof checkOut);
-console.log('getAttendance:', typeof getAttendance);
-console.log('getEmployeeAttendance:', typeof getEmployeeAttendance);
-console.log('getAttendanceSummary:', typeof getAttendanceSummary);
-
-// ✅ Protect all routes (Require login)
+// 🔒 Protect all attendance routes
 router.use(authController.protect);
+
+// ✅ EMPLOYEE - Auto Mark Attendance (HYBRID MODE)
+router.get(
+  '/auto-mark',
+  authorize.employee,
+  markDailyAttendance
+);
 
 // ✅ EMPLOYEE - Check In
 router.post(
@@ -73,21 +71,21 @@ router.post(
   adminAddAttendance
 );
 
-// ✅ HR/ADMIN - Get All Attendance with Filters
+// ✅ HR/ADMIN - Get All Attendance Records with Filters
 router.get(
   '/',
   authorize.hrOrAdmin,
   getAttendance
 );
 
-// ✅ HR/ADMIN - Get Summary (present, late, etc.)
+// ✅ HR/ADMIN - Attendance Summary by Status
 router.get(
   '/summary',
   authorize.hrOrAdmin,
   getAttendanceSummary
 );
 
-// ✅ HR/ADMIN - Get Attendance for Specific Employee
+// ✅ HR/ADMIN - Employee Attendance History
 router.get(
   '/employee/:id',
   authorize.hrOrAdmin,

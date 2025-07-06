@@ -1,7 +1,33 @@
 const Attendance = require('../models/Attendance');
 const { formatDate } = require('../utils/dateUtils');
 
-// Employee check-in
+// AUTO check-in when employee logs in or hits dashboard
+exports.markDailyAttendance = async (employeeId, ip, deviceInfo = '') => {
+  try {
+    const today = formatDate(new Date());
+
+    const existing = await Attendance.findOne({
+      employee: employeeId,
+      date: today
+    });
+
+    if (!existing) {
+      await Attendance.create({
+        employee: employeeId,
+        date: today,
+        checkIn: new Date(),
+        status: 'present',
+        method: 'auto',
+        ipAddress: ip,
+        deviceInfo: deviceInfo
+      });
+    }
+  } catch (error) {
+    console.error('Auto attendance error:', error.message);
+  }
+};
+
+// Manual employee check-in
 exports.checkIn = async (req, res) => {
   try {
     const today = formatDate(new Date());
@@ -23,7 +49,10 @@ exports.checkIn = async (req, res) => {
       employee: employeeId,
       date: today,
       checkIn: new Date(),
-      status: 'present'
+      status: 'present',
+      method: 'manual',
+      ipAddress: req.ip,
+      deviceInfo: req.headers['user-agent']
     });
 
     res.status(201).json({
@@ -40,7 +69,7 @@ exports.checkIn = async (req, res) => {
   }
 };
 
-// Employee check-out
+// Manual employee check-out
 exports.checkOut = async (req, res) => {
   try {
     const today = formatDate(new Date());
@@ -82,7 +111,7 @@ exports.checkOut = async (req, res) => {
   }
 };
 
-// Admin: manually add attendance
+// Admin manually adds attendance
 exports.adminAddAttendance = async (req, res) => {
   try {
     const { employee, date, checkIn, checkOut, status, notes } = req.body;
@@ -102,6 +131,7 @@ exports.adminAddAttendance = async (req, res) => {
       checkOut,
       status,
       notes,
+      method: 'admin',
       ipAddress: req.ip,
       deviceInfo: req.headers['user-agent']
     });
@@ -119,7 +149,7 @@ exports.adminAddAttendance = async (req, res) => {
   }
 };
 
-// Get attendance records with optional filters
+// Get attendance records with optional filters (Admin/HR)
 exports.getAttendance = async (req, res) => {
   try {
     const { startDate, endDate, department, status, page = 1, limit = 10 } = req.query;
@@ -151,7 +181,7 @@ exports.getAttendance = async (req, res) => {
   }
 };
 
-// Get attendance summary
+// Get attendance summary (Admin)
 exports.getAttendanceSummary = async (req, res) => {
   try {
     const summary = await Attendance.aggregate([
@@ -167,7 +197,7 @@ exports.getAttendanceSummary = async (req, res) => {
   }
 };
 
-// Get employee attendance
+// Get attendance for a specific employee
 exports.getEmployeeAttendance = async (req, res) => {
   try {
     const employeeId = req.params.id;
